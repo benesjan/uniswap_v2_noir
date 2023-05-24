@@ -7,6 +7,16 @@ impl Note {
   }
 }
 
+impl Note for ValueNote {
+  let owner: AztecAddress;
+  let value: Field;
+  let secret: Field;
+
+  fn generate_note_hash(&self) -> Field {
+    hash(self.owner, self.value, self.secret);
+  }
+}
+
 impl Note for PartialClaimNote {
   let account: AztecAddress;
   let input_amount: Field;
@@ -42,10 +52,6 @@ contract ZkToken {
 
   message portal_transfer_msg(Field: amount,  Field: recipient);
 
-
-  fn shield() {
-
-  }
   
   fn public_transfer(amount: Field, recipient: AztecAddress) {
     let mut user_balance = private_balances.at(msg.sender);
@@ -80,11 +86,12 @@ contract ZkToken {
   //   ctx.push_event(EncryptedSecret::new(encrypted_secret));
   // }
 
-  fn complete_partial_note(secret: Field, amount: Field) {
-    let partial_note_message = 
-    let result = oracle.consume_l1_to_l2_message(content, msgKey, secret)
-    // destroy notes
-
-    // create new notes
+  fn complete_partial_note(note_secret: Field, amount: Field) {
+    // User will claim the "deposit" which was performed by the uniswap portal with the partial note hash
+    let content = hash(amount, hash(note_secret, call_context.msg_sender));
+    let result = oracle.consume_l1_to_l2_message(content);
+    
+    let note = ValueNote::new(call_context.msg_sender, amount, note_secret);
+    balances.at(call_context.msg_sender).insert(note);
   }
 }

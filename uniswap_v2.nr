@@ -7,29 +7,38 @@ struct Deposit {
 }
 
 
-trait L1L2Message {};
-
-struct Swap{
-  swapId: Field;
-  token_address_a: Field;
-  token_address_b: Field;
-  amount_in: Field;
+trait L2L1Message {
+  fn generate_content();
 };
 
-impl L1L2Message for Swap;
-
-trait L2L1Message {};
-
-struct SwapResult {
-  swapId: Field;
+struct Swap{
+  swap_id: Field;
   token_address_a: Field;
   token_address_b: Field;
   amount_in: Field;
-  total_amount_out: Field;
-  succeeded: bool;
-}
+  partial_note_hashes_hash: Field;
+};
 
-impl L2L1Message for SwapResult;
+impl L2L1Message for Swap {
+  fn generate_content() -> Field {
+    hash(self.swap_id, self.token_address_a, self.token_address_b, self.amount_in, self.partial_note_hashes_hash)
+  }
+};
+
+// trait L2L1Message {
+//   fn generate_content();
+// };
+
+// struct SwapResult {
+//   swapId: Field;
+//   token_address_a: Field;
+//   token_address_b: Field;
+//   amount_in: Field;
+//   total_amount_out: Field;
+//   succeeded: bool;
+// }
+
+// impl L2L1Message for SwapResult;
 
 contract Uniswap {
   let partial_notes = Set::new();
@@ -69,12 +78,18 @@ contract Uniswap {
 
         // we could loop over the deposits and sum
         let aggregated_amount = 0;
+        let partial_note_hashes_hash: Field;
         for (i in 0..deposits.len()) {
           aggregated_amount += amount;
           ctx.push_note_hash(deposits[i].note_hash);
+          if (!i) {
+            partial_note_hashes_hash = hash(deposits[i].note_hash);
+          } else {
+            partial_note_hashes_hash = hash(partial_note_hashes_hash, deposits[i].note_hash);
+          }
         }
         
-        let msg = Swap::new(swapId, token_address_a, token_address_b, aggregated_amount)
+        let msg = Swap::new(swapId, token_address_a, token_address_b, aggregated_amount, partial_note_hashes_hash)
         ctx.push_l2_to_l1_msg(msg);
 
         IZkToken::l1Transfer(aggregated_amount, self::portal_address);
